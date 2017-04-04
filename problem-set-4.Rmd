@@ -1,6 +1,6 @@
 ---
 title: "Problem Set 4"
-author: "Your Name Here"
+author: "Stefan Haugen"
 date: "3/9/2017"
 output: html_document
 ---
@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE, comment = "#>")
 1. Publish HTML on Rpubs (you will need to sign up for the free account) and *add the link below*.
 1. Submit a PR with your answers.
 
-*Link to Rpubs document:* XXX
+*Link to Rpubs document:*http://rpubs.com/stefanhaugen/265128
 
 # Overview
 
@@ -50,10 +50,16 @@ project_io
 The `projects` and `project_io` tables have the `r intersect(names(projects), names(project_io))` column in common. Use this column to perform a `left_join` and identify the most expensive project for each institute. Project institutes are in the `projects` table, whereas total project costs are available in the `project_io` table. Note you will have to use the `arrange` and `slice` verbs from `dplyr`.
 
 ```{r problem_1, eval=FALSE}
-... %>%
-  left_join(...) %>%
-  arrange(...) %>%
-  slice(...)
+library(tidyr)
+library(tidyverse)
+install.packages('knitr')
+projects %>% select(project.num, institute) %>% left_join(project_io) %>% select(project.num, institute, total.cost) %>% group_by(institute) %>% arrange(desc(total.cost)) %>% slice(1:1) %>% arrange(desc(total.cost)) %>% ungroup() %>% slice(1:1) -> expensive_project
+expensive_project
+
+projects %>% select(project.num, fy.cost, institute) %>% left_join(project_io) %>% select(project.num, institute, fy.cost, total.cost) %>% group_by(institute) %>% arrange(desc(total.cost)) %>% slice(1:1) %>% arrange(desc(total.cost)) -> per_institute
+per_institute
+
+
 ```
 
 ## Problem 2
@@ -61,15 +67,25 @@ The `projects` and `project_io` tables have the `r intersect(names(projects), na
 Create a plot that describes the change in output (number of publications) for the most expensive grant from the above list. Note that you cannot use `n.pubs` for this, as that is an aggregate count over time. You need a tbl of following structure, which you can then use to calculate the number of publications each year (hint: use `n()` in a `summarize` statement:
 
 ```{r p2_tbl}
+projects %>% select(project.num, fy.cost, institute) %>% left_join(project_io) %>% select(project.num, institute, fy.cost, total.cost) %>% group_by(institute) %>% arrange(desc(total.cost)) %>% slice(1:1) %>% arrange(desc(total.cost)) -> per_institute
+
+per_institute %>% head(1) %>% left_join(publinks) %>% left_join(publications) %>% select(project.num, pub.year, fy.cost, total.cost, pmid) %>% na.omit() %>% select(project.num, institute, total.cost, pub.year, pmid) %>% group_by(project.num, institute, total.cost, pub.year) %>% summarize(total.pubs= n()) %>% na.omit() -> pubs_tbl
+ 
+ pubs_tbl
+```
+
+```{r problem}
 projects %>%
-  head() %>%
+  semi_join(per_institute) %>%
   left_join(publinks) %>%
   left_join(publications) %>%
   select(project.num, fiscal.year, fy.cost, pmid) %>%
-  na.omit()
-```
+  na.omit() %>%
+  group_by(fiscal.year) %>%
+  summarize(total.pubs = n()) -> total_pubs
 
-```{r problem_2}
+ggplot(pubs_tbl, aes(pub.year, total.pubs)) + geom_col(fill = "black") + xlab('Year of Publication') + ylab('Number of Publications') -> pubs_yearly
+pubs_yearly
 ```
 
 ## Problem 3
@@ -77,6 +93,12 @@ projects %>%
 Use the `projects` and `clinical_studies` table to calculate how many clinical studies have been started by projects from each institute.
 
 ```{r problem_3}
+
+inner_join(clinical_studies, projects) %>% group_by(institute) %>% filter(study.status != "COMPLETED") -> start_study
+start_study %>% 
+  group_by(institute, project.num) %>% 
+  na.omit() %>% 
+  summarise(n_distinct(trial.id))
 ```
 
 ## Problem 4
@@ -84,9 +106,10 @@ Use the `projects` and `clinical_studies` table to calculate how many clinical s
 Calculate correlations between `total.cost` and `n.pubs` for each institute. You will need to `join` the `projects` and `project_io` tables to link `institute` with `total.cost` and `n.pubs`. You will then need to use `group_by` and `do` from `dplyr` and `tidy` from `broom` to calculate correlations.
 
 ```{r problem_2, eval=FALSE}
-tab %>%
-  group_by(...) %>%
-  do(tidy(cor(..., ...)))
+
+
+left_join(projects, project_io) %>% select(institute, total.cost, n.pubs) %>% group_by(institute) %>% na.omit() %>% summarize(total.cost = sum(total.cost), sum_pubs = sum(n.pubs)) %>% do(tidy(cor(.$total.cost, .$sum_pubs)))
+
 ```
 
 ## Problem 5 (extra credit)
@@ -98,6 +121,11 @@ Correlate [`rcr`](https://icite.od.nih.gov/) values from the `publications` tabl
 - type of grant (e.g. R01, P01, R21, etc.). 
 
 ```{r extra_credit}
+
+
+
+
+
 ```
 
 ## Problem 6 (extra extra credit)
